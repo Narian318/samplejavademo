@@ -1,46 +1,45 @@
 pipeline{
     agent any
     tools{
-        maven 'apache-maven-3.8.6'
+        maven 'maven3'
+    }
+     environment {
+    DOCKERHUB_CREDENTIALS = credentials('nn-dockerhub')
     }
     
-      
     stages{
         stage('checkout the code'){
             steps{
-                git url:'https://github.com/bcreddydevops/samplejavademo.git', branch: 'master'
+                git url:'https://github.com/Narian318/samplejavademo.git', branch: 'master'
             }
         }
-        stage('build the code'){
+         stage('build the code'){
             steps{
                 sh 'mvn clean package'
             }
         }
          stage('Docker Build') {
             steps {
-                sh "docker build . -t chinnareddaiah/samplejavademo:${commit_id()}"
+                sh "docker build . -t narian318/nn-mvn-dckr-tomcat:${BUILD_NUMBER}"
             }
         }
-         stage('Docker Push') {
+        stage('Login') {
             steps {
-                withCredentials([string(credentialsId: 'docker-hub1', variable: 'hubpwd')]) {
-                 sh "docker login -u chinnareddaiah -p ${hubPwd}"
-                 sh "docker push chinnareddaiah/samplejavademo:${commit_id()}"
-              }
+        sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
             }
         }
-         stage('Docker Deploy') {
+        stage('Push') {
             steps {
-                sshagent(['docker-host']) {
-                    sh "ssh -o StrictHostKeyChecking=no ec2-user@3.84.212.218 docker rm -f samplejavademo"
-                    sh "ssh ec2-user@3.84.212.218 docker run -d -p 8080:8080 --name samplejavademo chinnareddaiah/samplejavademo:${commit_id()}"
+        sh 'docker push narian318/nn-mvn-dckr-tomcat:${BUILD_NUMBER}'
+            }
+        }
+        stage('Docker Deploy') {
+            steps {
+                sshagent(['nn-tomcat-ssh']) {
+                    sh "ssh -o StrictHostKeyChecking=no ec2-user@54.237.150.22 docker rm -f nn-tomcat-container"
+                    sh "ssh ec2-user@54.237.150.22 docker run -d -p 8080:8080 --name nn-tomcat-container narian318/nn-mvn-dckr-tomcat:${BUILD_NUMBER}"
                 }
             }
         }
     }
-}
-
- def commit_id(){
-    id = sh returnStdout: true, script: 'git rev-parse HEAD'
-    return id
-    }
+   }
